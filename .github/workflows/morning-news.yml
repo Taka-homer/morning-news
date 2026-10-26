@@ -2,8 +2,8 @@ name: 朝のニュース便
 
 on:
   schedule:
-    # 毎日 6:50 JST（= 21:50 UTC）。GitHub の混雑で実際の起動は数分〜数十分遅れることがある
-    - cron: "50 21 * * *"
+    # 毎日 6:30 JST（= 21:30 UTC）。GitHub の混雑で実際の起動は数分〜数十分遅れることがある
+    - cron: "30 21 * * *"
   # Actions 画面の「Run workflow」ボタンから手動実行できるようにする
   workflow_dispatch:
 

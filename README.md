@@ -100,7 +100,7 @@ python send_test.py
 
 ## 毎朝の自動配信（GitHub Actions）
 
-`.github/workflows/morning-news.yml` により、毎日 **6:50（日本時間）** に GitHub のサーバーで `morning_news.py` が実行されます。
+`.github/workflows/morning-news.yml` により、毎日 **6:30（日本時間）** に GitHub のサーバーで `morning_news.py` が実行されます。
 PCの電源が切れていても届きます。
 
 ### 初回セットアップ
@@ -131,7 +131,7 @@ PCの電源が切れていても届きます。
 | 日本時間 | cron |
 |---|---|
 | 6:00 | `"0 21 * * *"` |
-| 6:50 | `"50 21 * * *"` |
+| 6:30 | `"30 21 * * *"` |
 | 7:30 | `"30 22 * * *"` |
 
 - GitHub の混雑により、起動は数分〜数十分遅れることがあります（まれに大きく遅れたり、実行されないこともあります）
