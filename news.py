@@ -18,28 +18,55 @@ FEEDS = [
 MAX_AGE_HOURS = 48
 
 # ----- 建築カテゴリ -----
-ARCH_NAME = "建築"
-ARCH_LIMIT = 5
-# 建築・建設の専門メディア (媒体名, RSSのURL)
-ARCH_FEEDS = [
-    ("新建ハウジング", "https://www.s-housing.jp/feed"),
-    ("建設通信新聞", "https://www.kensetsunews.com/feed"),
-    ("日刊建設工業新聞", "https://www.decn.co.jp/?feed=rss2"),
+
+
+def google_news_url(query, lang):
+    """Googleニュース検索のRSSのURLを作る。lang は "ja" か "en"。"""
+    locale = "&hl=ja&gl=JP&ceid=JP:ja" if lang == "ja" else "&hl=en-US&gl=US&ceid=US:en"
+    return "https://news.google.com/rss/search?q=" + quote(query) + locale
+
+
+# 建築カテゴリの一覧。各カテゴリの設定：
+#   name   表示名
+#   limit  載せる件数
+#   feeds  専門メディア (媒体名, RSSのURL)
+#   topic  専門メディアで足りないときに使う、注目技術・業界課題のGoogleニュース検索
+ARCH_CATEGORIES = [
+    {
+        "name": "建築（国内）",
+        "limit": 5,
+        "feeds": [
+            ("新建ハウジング", "https://www.s-housing.jp/feed"),
+            ("建設通信新聞", "https://www.kensetsunews.com/feed"),
+            ("日刊建設工業新聞", "https://www.decn.co.jp/?feed=rss2"),
+        ],
+        "topic": google_news_url(
+            "(建設 OR 建築) (DX OR 人手不足 OR 新技術 OR 2024年問題) when:7d", "ja"
+        ),
+    },
+    {
+        "name": "建築（海外）",
+        "limit": 5,
+        "feeds": [
+            ("ArchDaily", "https://feeds.feedburner.com/Archdaily"),
+            ("Dezeen", "https://www.dezeen.com/architecture/feed/"),
+            ("designboom", "https://www.designboom.com/architecture/feed/"),
+            ("Construction Dive", "https://www.constructiondive.com/feeds/news/"),
+        ],
+        "topic": google_news_url(
+            '(architecture OR "construction industry") (building OR "labor shortage" OR innovation)'
+            " -stock -rating when:7d",
+            "en",
+        ),
+    },
 ]
 # 1媒体に偏らないよう、まずは1媒体あたりこの件数までにする
 ARCH_MAX_PER_SOURCE = 2
 # 48時間以内の記事で足りないときは、この日数までさかのぼる
 ARCH_BACKFILL_DAYS = 7
-# それでも足りないときに使う、注目技術・業界課題のGoogleニュース検索
-ARCH_TOPIC_QUERY = "(建設 OR 建築) (DX OR 人手不足 OR 新技術 OR 2024年問題) when:7d"
-ARCH_TOPIC_URL = (
-    "https://news.google.com/rss/search?q="
-    + quote(ARCH_TOPIC_QUERY)
-    + "&hl=ja&gl=JP&ceid=JP:ja"
-)
 
 # (接続タイムアウト秒, 応答待ちタイムアウト秒)
-TIMEOUT = (5, 10)
+TIMEOUT = (5, 20)
 USER_AGENT = "morning-news-bin/1.0 (personal use)"
 
 
@@ -111,12 +138,13 @@ def collect_news(now=None):
                 break
         results.append((name, picked, error))
 
-    results.append(collect_architecture(now, seen_links))
+    for category in ARCH_CATEGORIES:
+        results.append(collect_architecture(category, now, seen_links))
     return results
 
 
-def collect_architecture(now, seen_links):
-    """建築ニュースを ARCH_LIMIT 件集め、(表示名, 記事リスト, エラー) を返す。
+def collect_architecture(category, now, seen_links):
+    """建築ニュースを category["limit"] 件集め、(表示名, 記事リスト, エラー) を返す。
 
     1. 専門メディアの48時間以内の記事（1媒体 ARCH_MAX_PER_SOURCE 件まで）
     2. 足りなければ専門メディアの記事を ARCH_BACKFILL_DAYS 日前までさかのぼる
@@ -128,11 +156,14 @@ def collect_architecture(now, seen_links):
     oldest = datetime.min.replace(tzinfo=timezone.utc)
     errors = []
 
+    limit = category["limit"]
     candidates = []
-    for source, url in ARCH_FEEDS:
+    for source, url in category["feeds"]:
         articles, error = fetch_feed(url)
         if error:
             errors.append(f"{source}：{error}")
+            # ほかの媒体で埋まると本文には出ないため、ログにだけ残す
+            print(f"[警告] {category['name']}：{source} を取得できませんでした（{error}）")
         for article in articles:
             article["source"] = source
             candidates.append(article)
@@ -152,7 +183,7 @@ def collect_architecture(now, seen_links):
 
     def fill(pool, cutoff, cap=None):
         for article in pool:
-            if len(picked) >= ARCH_LIMIT:
+            if len(picked) >= limit:
                 return
             published = article["published"]
             if published is not None and published < cutoff:
@@ -168,8 +199,8 @@ def collect_architecture(now, seen_links):
     fill(candidates, backfill_cutoff, cap=ARCH_MAX_PER_SOURCE)
     fill(candidates, backfill_cutoff)
 
-    if len(picked) < ARCH_LIMIT:
-        topics, error = fetch_feed(ARCH_TOPIC_URL)
+    if len(picked) < limit:
+        topics, error = fetch_feed(category["topic"])
         if error:
             errors.append(f"Googleニュース：{error}")
         for article in topics:
@@ -178,4 +209,4 @@ def collect_architecture(now, seen_links):
         fill(topics, backfill_cutoff)
 
     error = "、".join(errors) if errors and not picked else None
-    return (ARCH_NAME, picked, error)
+    return (category["name"], picked, error)
