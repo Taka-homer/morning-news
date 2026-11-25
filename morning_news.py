@@ -30,10 +30,12 @@ def build_message(results, now):
         elif not articles:
             lines.append("（新しい記事はありません）")
         for article in articles:
-            lines.append(f"・{article['title']}")
+            extras = [x for x in (article.get("source"), article.get("note")) if x]
+            suffix = f"（{'・'.join(extras)}）" if extras else ""
+            lines.append(f"・{article['title']}{suffix}")
             lines.append(article["link"])
     lines.append("")
-    lines.append("出典：Yahoo!ニュース")
+    lines.append("出典：Yahoo!ニュース、建築は各専門紙・Googleニュース")
     return "\n".join(lines)
 
 

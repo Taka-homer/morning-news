@@ -1,8 +1,9 @@
-"""Yahoo!ニュース・トピックスのRSSから見出しを取得する。"""
+"""Yahoo!ニュース・トピックスと建築系ニュースのRSSから見出しを取得する。"""
 
 import xml.etree.ElementTree as ET
 from datetime import datetime, timedelta, timezone
 from email.utils import parsedate_to_datetime
+from urllib.parse import quote
 
 import requests
 
@@ -15,6 +16,27 @@ FEEDS = [
 
 # これより古い記事は載せない（更新が止まったフィードを見分けるため）
 MAX_AGE_HOURS = 48
+
+# ----- 建築カテゴリ -----
+ARCH_NAME = "建築"
+ARCH_LIMIT = 5
+# 建築・建設の専門メディア (媒体名, RSSのURL)
+ARCH_FEEDS = [
+    ("新建ハウジング", "https://www.s-housing.jp/feed"),
+    ("建設通信新聞", "https://www.kensetsunews.com/feed"),
+    ("日刊建設工業新聞", "https://www.decn.co.jp/?feed=rss2"),
+]
+# 1媒体に偏らないよう、まずは1媒体あたりこの件数までにする
+ARCH_MAX_PER_SOURCE = 2
+# 48時間以内の記事で足りないときは、この日数までさかのぼる
+ARCH_BACKFILL_DAYS = 7
+# それでも足りないときに使う、注目技術・業界課題のGoogleニュース検索
+ARCH_TOPIC_QUERY = "(建設 OR 建築) (DX OR 人手不足 OR 新技術 OR 2024年問題) when:7d"
+ARCH_TOPIC_URL = (
+    "https://news.google.com/rss/search?q="
+    + quote(ARCH_TOPIC_QUERY)
+    + "&hl=ja&gl=JP&ceid=JP:ja"
+)
 
 # (接続タイムアウト秒, 応答待ちタイムアウト秒)
 TIMEOUT = (5, 10)
@@ -89,4 +111,71 @@ def collect_news(now=None):
                 break
         results.append((name, picked, error))
 
+    results.append(collect_architecture(now, seen_links))
     return results
+
+
+def collect_architecture(now, seen_links):
+    """建築ニュースを ARCH_LIMIT 件集め、(表示名, 記事リスト, エラー) を返す。
+
+    1. 専門メディアの48時間以内の記事（1媒体 ARCH_MAX_PER_SOURCE 件まで）
+    2. 足りなければ専門メディアの記事を ARCH_BACKFILL_DAYS 日前までさかのぼる
+    3. それでも足りなければ、Googleニュースで注目技術・業界課題の記事を探す
+    48時間より古い記事には "note" に日付を入れる。
+    """
+    fresh_cutoff = now - timedelta(hours=MAX_AGE_HOURS)
+    backfill_cutoff = now - timedelta(days=ARCH_BACKFILL_DAYS)
+    oldest = datetime.min.replace(tzinfo=timezone.utc)
+    errors = []
+
+    candidates = []
+    for source, url in ARCH_FEEDS:
+        articles, error = fetch_feed(url)
+        if error:
+            errors.append(f"{source}：{error}")
+        for article in articles:
+            article["source"] = source
+            candidates.append(article)
+    # 新しい順（日付が読めない記事は最後）
+    candidates.sort(key=lambda a: a["published"] or oldest, reverse=True)
+
+    picked = []
+    per_source = {}
+
+    def take(article):
+        seen_links.add(article["link"])
+        published = article["published"]
+        if published is not None and published < fresh_cutoff:
+            article["note"] = f"{published.astimezone(timezone(timedelta(hours=9))):%m/%d}の記事"
+        picked.append(article)
+        per_source[article["source"]] = per_source.get(article["source"], 0) + 1
+
+    def fill(pool, cutoff, cap=None):
+        for article in pool:
+            if len(picked) >= ARCH_LIMIT:
+                return
+            published = article["published"]
+            if published is not None and published < cutoff:
+                continue
+            if article["link"] in seen_links:
+                continue
+            if cap is not None and per_source.get(article["source"], 0) >= cap:
+                continue
+            take(article)
+
+    fill(candidates, fresh_cutoff, cap=ARCH_MAX_PER_SOURCE)
+    fill(candidates, fresh_cutoff)
+    fill(candidates, backfill_cutoff, cap=ARCH_MAX_PER_SOURCE)
+    fill(candidates, backfill_cutoff)
+
+    if len(picked) < ARCH_LIMIT:
+        topics, error = fetch_feed(ARCH_TOPIC_URL)
+        if error:
+            errors.append(f"Googleニュース：{error}")
+        for article in topics:
+            article["source"] = "Googleニュース"
+        topics.sort(key=lambda a: a["published"] or oldest, reverse=True)
+        fill(topics, backfill_cutoff)
+
+    error = "、".join(errors) if errors and not picked else None
+    return (ARCH_NAME, picked, error)
