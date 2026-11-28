@@ -36,7 +36,8 @@ ARCH_CATEGORIES = [
         "name": "建築（国内）",
         "limit": 5,
         "feeds": [
-            ("新建ハウジング", "https://www.s-housing.jp/feed"),
+            # 新建ハウジングのRSSはGitHubのサーバーからだと403で拒否されるため、Googleニュース経由で取得する
+            ("新建ハウジング", google_news_url("site:s-housing.jp when:7d", "ja")),
             ("建設通信新聞", "https://www.kensetsunews.com/feed"),
             ("日刊建設工業新聞", "https://www.decn.co.jp/?feed=rss2"),
         ],
