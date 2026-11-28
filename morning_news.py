@@ -35,7 +35,7 @@ def build_message(results, now):
             lines.append(f"・{article['title']}{suffix}")
             lines.append(article["link"])
     lines.append("")
-    lines.append("出典：Yahoo!ニュース、建築は国内外の各専門メディア・Googleニュース")
+    lines.append("出典：Yahoo!ニュース、建築・不動産は各専門メディア・Googleニュース")
     return "\n".join(lines)
 
 

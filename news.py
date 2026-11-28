@@ -59,6 +59,23 @@ ARCH_CATEGORIES = [
             "en",
         ),
     },
+    {
+        # 不動産専門メディアはRSSを公開していないため、Googleニュースのサイト指定検索で取得する
+        "name": "不動産",
+        "limit": 5,
+        "feeds": [
+            ("R.E.port", google_news_url("site:re-port.net when:7d", "ja")),
+            ("住宅新報", google_news_url("site:jutaku-s.com when:7d", "ja")),
+            ("全国賃貸住宅新聞", google_news_url("site:zenchin.com when:7d", "ja")),
+            # 健美家はニュース記事（/ar/ns）に限定する（ほかは物件広告）
+            ("健美家", google_news_url("site:kenbiya.com/ar/ns when:7d", "ja")),
+        ],
+        "topic": google_news_url(
+            "(不動産 OR 地価 OR 住宅ローン OR マンション価格 OR 賃貸市場 OR 不動産投資)"
+            " -火災 -事故 -逮捕 when:7d",
+            "ja",
+        ),
+    },
 ]
 # 1媒体に偏らないよう、まずは1媒体あたりこの件数までにする
 ARCH_MAX_PER_SOURCE = 2
@@ -165,6 +182,13 @@ def collect_architecture(category, now, seen_links):
             # ほかの媒体で埋まると本文には出ないため、ログにだけ残す
             print(f"[警告] {category['name']}：{source} を取得できませんでした（{error}）")
         for article in articles:
+            if url.startswith("https://news.google.com/"):
+                # Googleニュースの見出しは末尾に「 - 媒体名」が付くので外す（媒体名は別に付ける）
+                title = article["title"]
+                title = "" if title.startswith("- ") else title.rsplit(" - ", 1)[0].strip()
+                if not title or title.endswith("一覧"):
+                    continue  # 見出しが空、または記事ではなく一覧ページ
+                article["title"] = title
             article["source"] = source
             candidates.append(article)
     # 新しい順（日付が読めない記事は最後）

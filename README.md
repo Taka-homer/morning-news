@@ -1,6 +1,6 @@
 # 朝のニュース便
 
-Yahoo!ニュース・トピックス（主要・経済・IT）と建築系専門メディアのRSSからニュースの見出しを取得し、
+Yahoo!ニュース・トピックス（主要・経済・IT）と建築・不動産系専門メディアのRSSからニュースの見出しを取得し、
 LINE Messaging API の Push API で自分のLINEへ1通にまとめて送るプログラムです。
 
 - 毎朝 GitHub Actions で自動配信（手元PCからの手動実行も可能）
@@ -167,7 +167,12 @@ https://www.s-housing.jp/archives/436000
 https://www.dezeen.com/2026/11/24/studio-gang-wisconsin-womens-leadership-center/
 ・（以下、海外5件）
 
-出典：Yahoo!ニュース、建築は国内外の各専門メディア・Googleニュース
+■不動産
+・「富士」駅前で再開発。商業、専門学校、住宅の複合施設（R.E.port）
+https://news.google.com/rss/articles/...
+・（以下、不動産5件）
+
+出典：Yahoo!ニュース、建築・不動産は各専門メディア・Googleニュース
 ```
 
 ## ニュースのカテゴリ・件数を変える
@@ -189,14 +194,15 @@ URLの `top-picks` の部分を置き換えます。
 - 同じ記事が複数のカテゴリにある場合は、先のカテゴリにだけ載せます
 - RSSはYahoo!ニュースの利用規約の範囲（個人利用）で使ってください。取得は実行1回につき各カテゴリ1回だけです
 
-### 建築カテゴリ
+### 建築・不動産カテゴリ
 
-建築は `news.py` の `ARCH_CATEGORIES` で設定し、国内・海外を各5件（`limit`）届けます。
+建築・不動産は `news.py` の `ARCH_CATEGORIES` で設定し、建築（国内）・建築（海外）・不動産を各5件（`limit`）届けます。
 
 | カテゴリ | 専門メディア（`feeds`） |
 |---|---|
 | 建築（国内） | 新建ハウジング・建設通信新聞・日刊建設工業新聞 |
 | 建築（海外） | ArchDaily・Dezeen・designboom・Construction Dive（英語の見出しのまま届きます） |
+| 不動産 | R.E.port・住宅新報・全国賃貸住宅新聞・健美家（RSSが無いため、Googleニュースのサイト指定検索で取得。リンクはGoogleニュース経由） |
 
 各カテゴリとも、次の順に集めます。
 
